@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Migration Console — by Piyush Bhadane</title>
+<meta name="description" content="Zero-setup database migration tool. Dump, restore, validate and rollback PostgreSQL & MySQL databases from a single JAR. Built by Piyush Bhadane.">
+<meta property="og:title" content="DB Migration Console">
+<meta property="og:description" content="Migrate PostgreSQL & MySQL databases with one command. Auto-backup, auto-rollback, real-time logs, multi-schema support.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Root ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #060810;
+  --bg2:      #0d1017;
+  --bg3:      #131822;
+  --surface:  #1a2030;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --text:     #e8edf8;
+  --text2:    #8a93b0;
+  --text3:    #454d66;
+  --blue:     #4f8ef7;
+  --blue2:    #3a7ae8;
+  --cyan:     #38bdf8;
+  --green:    #34d399;
+  --amber:    #fbbf24;
+  --red:      #f87171;
+  --glow:     rgba(79,142,247,0.15);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+/* ── Noise texture overlay ─────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 999; opacity: 0.4;
+}
+
+/* ── Grid background ───────────────────────────────────────── */
+.grid-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(79,142,247,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,142,247,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 0%, transparent 70%);
+}
+
+/* ── Nav ───────────────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 48px; height: 64px;
+  background: rgba(6,8,16,0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Instrument Serif', serif;
+  font-size: 18px; color: var(--text);
+  text-decoration: none;
+}
+
+.nav-logo-mark {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-logo-mark svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2; }
+
+.nav-links { display: flex; align-items: center; gap: 8px; }
+
+.nav-link {
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; color: var(--text2);
+  text-decoration: none; transition: all .15s;
+}
+.nav-link:hover { background: var(--surface); color: var(--text); }
+
+.nav-cta {
+  padding: 8px 18px; border-radius: 6px;
+  background: var(--blue); color: #fff;
+  font-size: 13px; font-weight: 600;
+  text-decoration: none; transition: all .15s;
+  border: none; cursor: pointer;
+}
+.nav-cta:hover { background: var(--blue2); transform: translateY(-1px); }
+
+/* ── Hero ──────────────────────────────────────────────────── */
+.hero {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 120px 24px 80px;
+  text-align: center;
+}
+
+.hero-glow {
+  position: absolute; top: 20%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, rgba(79,142,247,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; border-radius: 20px;
+  background: rgba(79,142,247,0.1);
+  border: 1px solid rgba(79,142,247,0.25);
+  font-size: 12px; font-weight: 600; color: var(--blue);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: .04em;
+  margin-bottom: 28px;
+  animation: fadeUp .6s ease both;
+}
+
+.hero-badge::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--blue);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.hero-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(44px, 7vw, 88px);
+  line-height: 1.05;
+  letter-spacing: -2px;
+  color: var(--text);
+  margin-bottom: 8px;
+  animation: fadeUp .7s .1s ease both;
+}
+
+.hero-title em {
+  font-style: italic;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: clamp(16px, 2vw, 20px);
+  color: var(--text2); font-weight: 300;
+  max-width: 560px; margin: 16px auto 0;
+  animation: fadeUp .7s .2s ease both;
+}
+
+.hero-actions {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 40px;
+  animation: fadeUp .7s .3s ease both;
+}
+
+.btn-hero {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 26px; border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+  text-decoration: none; transition: all .2s;
+  font-family: 'Outfit', sans-serif;
+}
+
+.btn-hero-primary {
+  background: var(--blue); color: #fff;
+  box-shadow: 0 0 30px rgba(79,142,247,0.3);
+}
+.btn-hero-primary:hover {
+  background: var(--blue2);
+  box-shadow: 0 0 40px rgba(79,142,247,0.5);
+  transform: translateY(-2px);
+}
+
+.btn-hero-ghost {
+  background: transparent; color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn-hero-ghost:hover {
+  background: var(--surface); color: var(--text);
+  transform: translateY(-1px);
+}
+
+.btn-hero svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Terminal mock ─────────────────────────────────────────── */
+.hero-terminal {
+  position: relative; z-index: 1;
+  margin: 60px auto 0;
+  max-width: 680px; width: 100%;
+  border-radius: 12px;
+  background: #0a0d14;
+  border: 1px solid var(--border2);
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  overflow: hidden;
+  animation: fadeUp .8s .4s ease both;
+}
+
+.terminal-bar {
+  display: flex; align-items: center; gap: 7px;
+  padding: 12px 16px;
+  background: #111520;
+  border-bottom: 1px solid var(--border);
+}
+
+.t-dot { width: 10px; height: 10px; border-radius: 50%; }
+.t-dot:nth-child(1) { background: #ff5f57; }
+.t-dot:nth-child(2) { background: #febc2e; }
+.t-dot:nth-child(3) { background: #28c840; }
+.terminal-title { margin-left: 8px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+
+.terminal-body { padding: 20px; font-family: 'DM Mono', monospace; font-size: 12.5px; line-height: 2; }
+.t-line { display: flex; gap: 10px; }
+.t-prompt { color: var(--blue); flex-shrink: 0; }
+.t-cmd { color: var(--text); }
+.t-ok   { color: var(--green); }
+.t-warn { color: var(--amber); }
+.t-info { color: #6b9ef8; }
+.t-dim  { color: var(--text3); }
+
+/* Typing cursor */
+.cursor::after {
+  content: '▋';
+  animation: blink .9s step-end infinite;
+  color: var(--blue);
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── Section base ──────────────────────────────────────────── */
+section { position: relative; z-index: 1; padding: 100px 24px; }
+
+.section-inner { max-width: 1100px; margin: 0 auto; }
+
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--blue); margin-bottom: 14px;
+}
+
+.section-title {
+  font-family: 'Instrument Serif', serif;
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.1; letter-spacing: -1px;
+  color: var(--text);
+}
+
+.section-title em {
+  font-style: italic; color: var(--blue);
+}
+
+.section-sub {
+  font-size: 16px; color: var(--text2);
+  max-width: 540px; margin-top: 14px;
+  font-weight: 300;
+}
+
+/* ── Stats bar ─────────────────────────────────────────────── */
+.stats-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  margin-top: 80px;
+}
+
+.stat-cell {
+  background: var(--bg2); padding: 28px 24px;
+  text-align: center;
+}
+
+.stat-num {
+  font-family: 'Instrument Serif', serif;
+  font-size: 42px; color: var(--text);
+  line-height: 1;
+}
+
+.stat-num span { color: var(--blue); }
+
+.stat-label {
+  font-size: 12px; color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  margin-top: 6px; letter-spacing: .05em;
+}
+
+/* ── Features grid ─────────────────────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 56px;
+}
+
+.feat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  transition: border-color .2s, transform .2s;
+  position: relative; overflow: hidden;
+}
+
+.feat-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 0% 0%, rgba(79,142,247,0.06), transparent 60%);
+  opacity: 0; transition: opacity .3s;
+}
+
+.feat-card:hover { border-color: rgba(79,142,247,0.3); transform: translateY(-3px); }
+.feat-card:hover::before { opacity: 1; }
+
+.feat-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: rgba(79,142,247,0.1);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.feat-icon svg { width: 18px; height: 18px; stroke: var(--blue); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.feat-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.feat-desc  { font-size: 13px; color: var(--text2); line-height: 1.6; font-weight: 300; }
+
+/* Feature card accent colors */
+.feat-card.green .feat-icon { background: rgba(52,211,153,0.1); }
+.feat-card.green .feat-icon svg { stroke: var(--green); }
+.feat-card.amber .feat-icon { background: rgba(251,191,36,0.1); }
+.feat-card.amber .feat-icon svg { stroke: var(--amber); }
+.feat-card.cyan  .feat-icon { background: rgba(56,189,248,0.1); }
+.feat-card.cyan  .feat-icon svg { stroke: var(--cyan); }
+.feat-card.red   .feat-icon { background: rgba(248,113,113,0.1); }
+.feat-card.red   .feat-icon svg { stroke: var(--red); }
+
+/* ── Architecture diagram ──────────────────────────────────── */
+.arch-section { background: var(--bg2); }
+
+.arch-diagram {
+  margin-top: 56px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; flex-wrap: wrap;
+}
+
+.arch-node {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 24px 28px;
+  text-align: center;
+  min-width: 160px;
+  position: relative;
+}
+
+.arch-node-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 12px;
+  font-size: 22px;
+}
+
+.arch-node-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.arch-node-sub   { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 4px; }
+
+.arch-node.highlight {
+  border-color: rgba(79,142,247,0.4);
+  background: rgba(79,142,247,0.05);
+  box-shadow: 0 0 30px rgba(79,142,247,0.1);
+}
+
+.arch-arrow {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 0 16px;
+}
+
+.arch-arrow-line {
+  width: 60px; height: 1px;
+  background: linear-gradient(90deg, var(--border2), var(--blue), var(--border2));
+  position: relative;
+}
+
+.arch-arrow-line::after {
+  content: '▶';
+  position: absolute; right: -8px; top: -7px;
+  font-size: 10px; color: var(--blue);
+}
+
+.arch-arrow-label {
+  font-size: 10px; color: var(--text3);
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+}
+
+/* ── How it works steps ────────────────────────────────────── */
+.steps {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 0; margin-top: 56px; position: relative;
+}
+
+.steps::before {
+  content: '';
+  position: absolute; top: 24px; left: 10%; right: 10%;
+  height: 1px; background: linear-gradient(90deg, transparent, var(--border2), var(--blue), var(--border2), transparent);
+}
+
+.step {
+  text-align: center; padding: 0 12px;
+  position: relative; z-index: 1;
+}
+
+.step-num {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--bg2); border: 2px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-size: 13px;
+  color: var(--text2); margin: 0 auto 16px;
+  font-weight: 500;
+  transition: all .3s;
+}
+
+.step:hover .step-num {
+  border-color: var(--blue); color: var(--blue);
+  background: rgba(79,142,247,0.08);
+  box-shadow: 0 0 20px rgba(79,142,247,0.2);
+}
+
+.step-title  { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.step-desc   { font-size: 11.5px; color: var(--text2); line-height: 1.5; font-weight: 300; }
+
+/* ── Multi-schema callout ──────────────────────────────────── */
+.schema-callout {
+  margin-top: 56px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+}
+
+.schema-callout-head {
+  padding: 24px 28px 0;
+}
+
+.schema-log {
+  padding: 20px 24px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  line-height: 2; background: #080b12;
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+}
+
+/* ── Network diagram ───────────────────────────────────────── */
+.network-section { background: var(--bg); }
+
+.network-diagram {
+  margin-top: 56px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 16px; padding: 48px;
+  display: grid; grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 24px; align-items: center;
+}
+
+.net-node {
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 12px; padding: 24px 20px; text-align: center;
+}
+
+.net-node.you { border-color: rgba(79,142,247,0.4); background: rgba(79,142,247,0.05); }
+.net-node-emoji { font-size: 32px; margin-bottom: 10px; }
+.net-node-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.net-node-sub   { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 4px; }
+
+.net-arrow {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+
+.net-arrow-track {
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, var(--border2), var(--blue), var(--border2));
+  border-radius: 2px; position: relative;
+}
+
+.net-arrow-track::after {
+  content: '▶'; position: absolute; right: -6px; top: -8px;
+  font-size: 11px; color: var(--blue);
+}
+
+.net-arrow-label {
+  font-size: 10px; color: var(--text3);
+  font-family: 'DM Mono', monospace; white-space: nowrap;
+}
+
+.net-note {
+  margin-top: 24px; padding: 16px 20px;
+  background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.15);
+  border-radius: 8px; font-size: 13px; color: var(--green);
+  display: flex; gap: 8px; align-items: flex-start;
+}
+
+/* ── Comparison table ──────────────────────────────────────── */
+.compare-table {
+  width: 100%; border-collapse: collapse;
+  margin-top: 48px; font-size: 13px;
+}
+
+.compare-table th {
+  padding: 14px 16px; text-align: left;
+  font-size: 11px; font-weight: 600; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--text3);
+  border-bottom: 1px solid var(--border);
+}
+
+.compare-table th.highlight { color: var(--blue); }
+
+.compare-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  vertical-align: middle;
+}
+
+.compare-table tr:hover td { background: rgba(255,255,255,0.015); }
+.compare-table td:first-child { color: var(--text); font-weight: 500; }
+.compare-table td.hl { background: rgba(79,142,247,0.04); color: var(--text); font-weight: 500; }
+
+.check  { color: var(--green); font-size: 15px; }
+.cross  { color: var(--red);   font-size: 15px; }
+.partial{ color: var(--amber); font-size: 13px; }
+
+/* ── CTA section ───────────────────────────────────────────── */
+.cta-section {
+  text-align: center;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(79,142,247,0.08), transparent);
+}
+
+.cta-section .section-title { font-size: clamp(36px, 5vw, 64px); }
+
+.contact-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; max-width: 760px; margin: 48px auto 0;
+}
+
+.contact-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 28px 20px; text-align: center;
+  text-decoration: none; color: inherit;
+  transition: all .2s; display: block;
+}
+.contact-card:hover {
+  border-color: var(--blue);
+  background: rgba(79,142,247,0.06);
+  transform: translateY(-3px);
+}
+.contact-card-icon { font-size: 28px; margin-bottom: 12px; }
+.contact-card-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.contact-card-sub   { font-size: 12px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+/* ── Footer ────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 48px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--text3);
+  font-family: 'DM Mono', monospace;
+}
+
+footer a { color: var(--text3); text-decoration: none; }
+footer a:hover { color: var(--text2); }
+
+/* ── Animations ────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.reveal {
+  opacity: 0; transform: translateY(32px);
+  transition: opacity .7s ease, transform .7s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .features-grid { grid-template-columns: 1fr 1fr; }
+  .steps { grid-template-columns: 1fr; gap: 24px; }
+  .steps::before { display: none; }
+  .stats-bar { grid-template-columns: 1fr 1fr; }
+  .compare-table { font-size: 12px; }
+  .network-diagram { grid-template-columns: 1fr; padding: 24px; }
+  .net-arrow { display: none; }
+  .contact-cards { grid-template-columns: 1fr; }
+  footer { flex-direction: column; gap: 12px; text-align: center; }
+}
+
+@media (max-width: 600px) {
+  .features-grid { grid-template-columns: 1fr; }
+  .arch-diagram { flex-direction: column; }
+  .arch-arrow { transform: rotate(90deg); }
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--surface); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- ── NAV ──────────────────────────────────────────────────── -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v4c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 9v5c0 1.66 4.03 3 9 3s9-1.34 9-3V9"/><path d="M3 14v5c0 1.66 4.03 3 9 3s9-1.34 9-3v-5"/></svg>
+    </div>
+    DB Migration Console
+  </a>
+  <div class="nav-links">
+    <a href="#features" onclick="scrollToSection('features'); return false;"     class="nav-link">Features</a>
+    <a href="#how-it-works" onclick="scrollToSection('how-it-works'); return false;" class="nav-link">How it Works</a>
+    <a href="#architecture" onclick="scrollToSection('architecture'); return false;" class="nav-link">Architecture</a>
+    <a href="#compare" onclick="scrollToSection('compare'); return false;"      class="nav-link">Compare</a>
+    <a href="#contact" onclick="scrollToSection('contact'); return false;"      class="nav-link">Contact</a>
+  </div>
+  <a href="mailto:piyushbhadane@yourdomain.com?subject=DB%20Migration%20Console%20%E2%80%94%20Inquiry&body=Hi%20Piyush%2C%0A%0AI%20came%20across%20DB%20Migration%20Console%20and%20I%27m%20interested%20in%20learning%20more.%0A%0AName%3A%0AOrganization%3A%0AUse%20case%3A%0A%0ALooking%20forward%20to%20hearing%20from%20you." class="nav-cta">Get in Touch</a>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <div class="hero-badge">v1.0.0 — Now Available</div>
+
+  <h1 class="hero-title">
+    Migrate databases<br><em>without the anxiety</em>
+  </h1>
+
+  <p class="hero-subtitle">
+    A self-contained tool that automates the full PostgreSQL &amp; MySQL migration lifecycle —
+    backup, dump, restore, validate, and rollback — from a single JAR file.
+  </p>
+
+  <div class="hero-actions">
+    <a href="mailto:piyushbhadane@yourdomain.com?subject=DB%20Migration%20Console%20%E2%80%94%20Inquiry&body=Hi%20Piyush%2C%0A%0AI%20came%20across%20DB%20Migration%20Console%20and%20I%27m%20interested%20in%20learning%20more.%0A%0AName%3A%0AOrganization%3A%0AUse%20case%3A%0A%0ALooking%20forward%20to%20hearing%20from%20you." class="btn-hero btn-hero-primary">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      Contact for Access
+    </a>
+
+  </div>
+
+  <!-- Terminal mock -->
+  <div class="hero-terminal">
+    <div class="terminal-bar">
+      <div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div>
+      <span class="terminal-title">Migration Console — Live Output</span>
+    </div>
+    <div class="terminal-body">
+      <div class="t-line"><span class="t-info">[INFO]</span><span class="t-cmd">Disk space OK — 48,320 MB free in dump directory</span></div>
+      <div class="t-line"><span class="t-info">[INFO]</span><span class="t-cmd">Step 1/5 — Backing up target database before overwrite</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Backup saved: backup_MIG-1743580800_20260402_091500.dump</span></div>
+      <div class="t-line"><span class="t-info">[INFO]</span><span class="t-cmd">Step 2/5 — Dumping source: server-a.internal/QWE</span></div>
+      <div class="t-line"><span class="t-dim">[dump]</span><span class="t-cmd">pg_dump: dumping schema A1 (300 tables)…</span></div>
+      <div class="t-line"><span class="t-dim">[dump]</span><span class="t-cmd">pg_dump: dumping schema B1 (150 tables)…</span></div>
+      <div class="t-line"><span class="t-dim">[dump]</span><span class="t-cmd">pg_dump: dumping schema C1 (70 tables)…</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Dump created: dump_MIG-1743580800.dump (2,840 MB)</span></div>
+      <div class="t-line"><span class="t-info">[INFO]</span><span class="t-cmd">Step 4/5 — Restoring into target: server-b.beta/QWE</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Restore complete</span></div>
+      <div class="t-line"><span class="t-info">[INFO]</span><span class="t-cmd">Discovered 3 schema(s): [A1, B1, C1]</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Schema [A1] — tables: 300/300 ✓ | views: 12/12 ✓ | constraints: 890/890 ✓</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Schema [B1] — tables: 150/150 ✓ | views: 5/5 ✓ | constraints: 430/430 ✓</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Schema [C1] — tables: 70/70 ✓ | views: 3/3 ✓ | constraints: 180/180 ✓</span></div>
+      <div class="t-line"><span class="t-ok">  [OK]</span><span class="t-cmd">Row counts: 520 tables matched &nbsp;<span class="cursor"></span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── STATS ─────────────────────────────────────────────────── -->
+<section style="padding: 0 24px 80px;">
+  <div class="section-inner">
+    <div class="stats-bar reveal">
+      <div class="stat-cell">
+        <div class="stat-num">1<span>JAR</span></div>
+        <div class="stat-label">zero install</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num">5<span>steps</span></div>
+        <div class="stat-label">automated pipeline</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num">2<span>DBs</span></div>
+        <div class="stat-label">PostgreSQL + MySQL</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-num">0<span>clicks</span></div>
+        <div class="stat-label">to roll back on failure</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURES ──────────────────────────────────────────────── -->
+<section id="features">
+  <div class="section-inner">
+    <p class="section-label reveal">Features</p>
+    <h2 class="section-title reveal">Everything a real migration needs.</h2>
+    <p class="section-sub reveal">Not just a wrapper around pg_dump. A complete safety harness around the entire migration lifecycle.</p>
+
+    <div class="features-grid">
+
+      <div class="feat-card reveal green">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <div class="feat-title">Auto Backup + Auto Rollback</div>
+        <div class="feat-desc">Target is snapshotted before every migration. If anything fails, the system restores the backup automatically. No manual intervention required.</div>
+      </div>
+
+      <div class="feat-card reveal">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <div class="feat-title">Real-Time Log Streaming</div>
+        <div class="feat-desc">Every line from pg_dump and pg_restore is streamed to the browser terminal live. No more staring at a frozen progress bar for 20 minutes.</div>
+      </div>
+
+      <div class="feat-card reveal amber">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+        <div class="feat-title">Disk Space Pre-Check</div>
+        <div class="feat-desc">Checks available disk space before Step 1 starts. A 50GB database silently filling your disk mid-migration is now impossible.</div>
+      </div>
+
+      <div class="feat-card reveal cyan">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+        <div class="feat-title">Multi-Schema Support</div>
+        <div class="feat-desc">Validates all PostgreSQL schemas (A1, B1, C1…) — tables, views, constraints, and row counts — per schema. Not just the public schema.</div>
+      </div>
+
+      <div class="feat-card reveal">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="feat-title">Role Migration (PostgreSQL)</div>
+        <div class="feat-desc">Dumps roles via pg_dumpall --globals-only and restores them to the target. Existing roles are skipped automatically.</div>
+      </div>
+
+      <div class="feat-card reveal green">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div class="feat-title">Full Validation Layer</div>
+        <div class="feat-desc">Post-restore JDBC check covers tables, views, constraints (PK/UK/FK/CHECK), and row counts with ±5% delta tolerance per table.</div>
+      </div>
+
+      <div class="feat-card reveal">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg></div>
+        <div class="feat-title">Ping / Reachability Check</div>
+        <div class="feat-desc">TCP ping any DB host before migrating. Shows resolved IP, avg/min/max latency, packet loss, and per-probe results. No ICMP or root required.</div>
+      </div>
+
+      <div class="feat-card reveal amber">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+        <div class="feat-title">Persistent Audit History</div>
+        <div class="feat-desc">Every migration persisted to embedded H2 DB with full logs. Browse history, view per-run logs, track durations — survives restarts.</div>
+      </div>
+
+      <div class="feat-card reveal red">
+        <div class="feat-icon"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <div class="feat-title">Browser UI, Zero Setup</div>
+        <div class="feat-desc">One JAR, one command — browser opens automatically. No Docker, no npm, no config files. Works on Windows, Linux, and macOS.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── NETWORK / YOUR SCENARIO ───────────────────────────────── -->
+<section id="architecture" class="network-section">
+  <div class="section-inner">
+    <p class="section-label reveal">Deployment Model</p>
+    <h2 class="section-title reveal">Run it from <em>your laptop.</em><br>Reach any server.</h2>
+    <p class="section-sub reveal">No agent on the servers. No SSH tunnels. Just network access to the DB port.</p>
+
+    <div class="network-diagram reveal">
+      <div class="net-node">
+        <div class="net-node-emoji">🖥️</div>
+        <div class="net-node-label">Server A</div>
+        <div class="net-node-sub">source database<br>internal / production</div>
+      </div>
+      <div class="net-arrow">
+        <div class="net-arrow-track"></div>
+        <div class="net-arrow-label">pg_dump -h serverA</div>
+        <div class="net-arrow-label">dump → local disk</div>
+      </div>
+      <div class="net-node you">
+        <div class="net-node-emoji">💻</div>
+        <div class="net-node-label">Your Laptop</div>
+        <div class="net-node-sub">runs the JAR<br>orchestrates everything</div>
+      </div>
+      <div class="net-arrow">
+        <div class="net-arrow-track"></div>
+        <div class="net-arrow-label">pg_restore -h serverB</div>
+        <div class="net-arrow-label">local disk → restore</div>
+      </div>
+      <div class="net-node">
+        <div class="net-node-emoji">🖥️</div>
+        <div class="net-node-label">Server B</div>
+        <div class="net-node-sub">target database<br>beta / staging</div>
+      </div>
+    </div>
+
+    <div class="net-note reveal">
+      <span>✓</span>
+      <span>Nothing needs to be installed on Server A or Server B — not even Java.
+      The dump lands on your laptop's disk. Your laptop talks to both servers over TCP port 5432.
+      Works on any LAN, VPN, or cloud environment where the DB port is reachable.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ──────────────────────────────────────────── -->
+<section id="how-it-works" style="background: var(--bg2);">
+  <div class="section-inner">
+    <p class="section-label reveal">Pipeline</p>
+    <h2 class="section-title reveal">Five steps.<br><em>Fully automated.</em></h2>
+    <p class="section-sub reveal">Every step runs sequentially. Any failure triggers immediate rollback from the Step 1 backup.</p>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <div class="step-title">Backup Target</div>
+        <div class="step-desc">Snapshot the target DB before any overwrite. Safety net for auto-rollback.</div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">02</div>
+        <div class="step-title">Dump Source</div>
+        <div class="step-desc">pg_dump / mysqldump with live line-by-line output. Disk space checked first.</div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">03</div>
+        <div class="step-title">Verify</div>
+        <div class="step-desc">Dump file integrity check. Size and checksum confirmed before restore.</div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">04</div>
+        <div class="step-title">Restore</div>
+        <div class="step-desc">pg_restore / mysql client on target. Live output. Warnings distinguished from errors.</div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">05</div>
+        <div class="step-title">Validate</div>
+        <div class="step-desc">JDBC checks tables, views, constraints, and row counts per schema. Full report.</div>
+      </div>
+    </div>
+
+    <!-- Multi-schema callout -->
+    <div class="schema-callout reveal" style="margin-top:56px">
+      <div class="schema-callout-head">
+        <div class="section-label" style="margin-bottom:8px">Multi-Schema Validation Example</div>
+        <p style="font-size:13px;color:var(--text2)">Database QWE with schemas A1 (300 tables), B1 (150 tables), C1 (70 tables)</p>
+      </div>
+      <div class="schema-log">
+        <div class="t-line"><span class="t-info">[INFO]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Discovered 3 user schema(s): [A1, B1, C1]</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Schema [A1] — tables: 300/300 ✓ &nbsp;|&nbsp; views: 12/12 ✓ &nbsp;|&nbsp; constraints: 890/890 ✓</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Schema [B1] — tables: 150/150 ✓ &nbsp;|&nbsp; views: 5/5 ✓ &nbsp;&nbsp;|&nbsp; constraints: 430/430 ✓</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Schema [C1] — tables: 70/70 ✓ &nbsp;&nbsp;|&nbsp; views: 3/3 ✓ &nbsp;&nbsp;|&nbsp; constraints: 180/180 ✓</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Tables OK — 520 tables across all schemas match</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Row counts: 520 tables matched</span></div>
+        <div class="t-line"><span class="t-ok">  [OK]</span>&nbsp;&nbsp;<span style="color:var(--text2)">Migration MIG-1743580800 completed successfully in 847s</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── COMPARE ───────────────────────────────────────────────── -->
+<section id="compare">
+  <div class="section-inner">
+    <p class="section-label reveal">Comparison</p>
+    <h2 class="section-title reveal">How it stacks up.</h2>
+    <p class="section-sub reveal">Compared against the tools developers actually reach for when they need to migrate a database.</p>
+
+    <div class="reveal" style="overflow-x:auto;margin-top:48px">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="highlight">DB Migration Console</th>
+            <th>pgAdmin 4</th>
+            <th>DBeaver</th>
+            <th>AWS DMS</th>
+            <th>Flyway</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Zero-setup single JAR</td><td class="hl"><span class="check">✓</span> Yes</td><td><span class="cross">✗</span> Install</td><td><span class="cross">✗</span> Install</td><td><span class="cross">✗</span> Cloud</td><td><span class="cross">✗</span> Install</td></tr>
+          <tr><td>Works fully offline / on-prem</td><td class="hl"><span class="check">✓</span> Yes</td><td><span class="check">✓</span> Yes</td><td><span class="check">✓</span> Yes</td><td><span class="cross">✗</span> AWS only</td><td><span class="check">✓</span> Yes</td></tr>
+          <tr><td>Auto backup before migrate</td><td class="hl"><span class="check">✓</span> Built-in</td><td><span class="cross">✗</span> Manual</td><td><span class="cross">✗</span> Manual</td><td><span class="partial">~ </span>Snapshots</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Auto rollback on failure</td><td class="hl"><span class="check">✓</span> Built-in</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="partial">~ </span>Partial</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Live log streaming in UI</td><td class="hl"><span class="check">✓</span> Real-time</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="partial">~ </span>Console</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Disk space pre-check</td><td class="hl"><span class="check">✓</span> Built-in</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> N/A</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Multi-schema validation</td><td class="hl"><span class="check">✓</span> All schemas</td><td><span class="partial">~ </span>Manual</td><td><span class="partial">~ </span>Manual</td><td><span class="partial">~ </span>Some</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Role migration (PostgreSQL)</td><td class="hl"><span class="check">✓</span> pg_dumpall</td><td><span class="partial">~ </span>Manual</td><td><span class="partial">~ </span>Manual</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>TCP ping / reachability</td><td class="hl"><span class="check">✓</span> Built-in</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td></tr>
+          <tr><td>Persistent audit history</td><td class="hl"><span class="check">✓</span> H2 DB</td><td><span class="cross">✗</span> No</td><td><span class="cross">✗</span> No</td><td><span class="check">✓</span> CloudWatch</td><td><span class="check">✓</span> schema_history</td></tr>
+
+          <tr><td>Data stays on-premises</td><td class="hl"><span class="check">✓</span> Fully local</td><td><span class="check">✓</span> Fully local</td><td><span class="check">✓</span> Fully local</td><td><span class="cross">✗</span> AWS processes</td><td><span class="check">✓</span> Fully local</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA / CONTACT ─────────────────────────────────────────── -->
+<section id="contact" class="cta-section">
+  <div class="section-inner">
+    <p class="section-label reveal">Get in Touch</p>
+    <h2 class="section-title reveal">Interested in using<br><em>DB Migration Console?</em></h2>
+    <p class="section-sub reveal" style="margin: 14px auto 0; text-align:center">
+      Reach out for demos, licensing, integration support,<br>or collaboration opportunities.
+    </p>
+
+    <div class="contact-cards">
+      <a href="https://www.linkedin.com/in/piyush-bhadane-" target="_blank" class="contact-card reveal">
+        <div class="contact-card-icon">💼</div>
+        <div class="contact-card-label">LinkedIn</div>
+        <div class="contact-card-sub">piyushbhadane</div>
+      </a>
+      <a href="mailto:piyushbhadane@yourdomain.com?subject=DB%20Migration%20Console%20%E2%80%94%20Inquiry&body=Hi%20Piyush%2C%0A%0AI%20came%20across%20DB%20Migration%20Console%20and%20I%27m%20interested%20in%20learning%20more.%0A%0AName%3A%0AOrganization%3A%0AUse%20case%3A%0A%0ALooking%20forward%20to%20hearing%20from%20you." class="contact-card reveal">
+        <div class="contact-card-icon">✉️</div>
+        <div class="contact-card-label">Email</div>
+        <div class="contact-card-sub">piyushbhadane@<br>gmail.com</div>
+      </a>
+      <a href="https://github.com/PiyushBhadane55" target="_blank" class="contact-card reveal">
+        <div class="contact-card-icon">⚙️</div>
+        <div class="contact-card-label">GitHub</div>
+        <div class="contact-card-sub">piyushbhadane</div>
+      </a>
+    </div>
+
+    <p style="margin-top:40px;font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;" class="reveal">
+      Built with Java 17 · Spring Boot 3.2 · H2 · pg_dump · mysqldump
+    </p>
+  </div>
+</section>
+
+<!-- ── FOOTER ────────────────────────────────────────────────── -->
+<footer>
+  <span>© 2026 Piyush Bhadane — All Rights Reserved</span>
+  <span>DB Migration Console v1.0.0</span>
+  <span>Unauthorized use prohibited</span>
+</footer>
+
+<script>
+// ── Smooth scroll helper ─────────────────────────────────────
+function scrollToSection(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Scroll reveal ─────────────────────────────────────────────
+const observer = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      // stagger siblings
+      const siblings = Array.from(e.target.parentElement.querySelectorAll('.reveal'));
+      const idx = siblings.indexOf(e.target);
+      setTimeout(() => e.target.classList.add('visible'), idx * 80);
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Smooth active nav ────────────────────────────────────────
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-link');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 100) current = s.id;
+  });
+  navLinks.forEach(l => {
+    l.style.color = l.getAttribute('href') === '#' + current
+      ? 'var(--text)' : '';
+  });
+});
+</script>
+</body>
+</html>
